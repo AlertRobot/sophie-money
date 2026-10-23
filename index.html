@@ -1,0 +1,820 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Sophie's Money</title>
+<meta name="description" content="Sophie's payday plan, spending and budget. Works offline.">
+<meta name="theme-color" content="#2F7D6D">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Money">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="./apple-touch-icon.png">
+<style>
+/* Layout: one phone-width column with three tabs (Today, Add, Plan) on a sticky bar; summary first, detail below. */
+:root{
+  --bg:#F4F6F5; --card:#FFFFFF; --ink:#1E2B28; --muted:#5D6D69; --line:#DCE3E1;
+  --accent:#2F7D6D; --accent-ink:#FFFFFF; --accent-soft:#E2F1ED; --warm:#B5563B; --warm-soft:#F8E8E2;
+  --good:#2F7D6D; --bad:#B23B3B; --bad-soft:#F7E3E3;
+  --display:ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --body:system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#121816; --card:#1B2321; --ink:#E7EFEC; --muted:#9AAAA5; --line:#2C3835;
+  --accent:#6CC4AE; --accent-ink:#0E1F1B; --accent-soft:#1F3631; --warm:#E99377; --warm-soft:#3A2620;
+  --good:#6CC4AE; --bad:#F08A8A; --bad-soft:#3A2222; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#121816; --card:#1B2321; --ink:#E7EFEC; --muted:#9AAAA5; --line:#2C3835;
+  --accent:#6CC4AE; --accent-ink:#0E1F1B; --accent-soft:#1F3631; --warm:#E99377; --warm-soft:#3A2620;
+  --good:#6CC4AE; --bad:#F08A8A; --bad-soft:#3A2222; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none !important}
+html{-webkit-text-size-adjust:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.5;margin:0}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+.wrap{max-width:600px;margin:0 auto;padding-top:calc(env(safe-area-inset-top,0px) + 16px);padding-bottom:calc(env(safe-area-inset-bottom,0px) + 48px);padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));display:grid;gap:16px}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0;letter-spacing:-0.01em}
+h1{font-size:1.8rem;line-height:1.1}
+h2{font-size:1.2rem}
+h3{font-size:1rem}
+p{margin:0}
+.muted{color:var(--muted)}
+.small{font-size:.88rem}
+.num{font-variant-numeric:tabular-nums;font-weight:700;white-space:nowrap}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;display:grid;gap:12px;min-width:0}
+.tabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding-block:8px}
+.tabs button{font:inherit;font-weight:700;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:12px 4px;cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.row{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+.big{font-family:var(--display);font-size:2rem;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.1}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.tile{background:var(--accent-soft);border-radius:12px;padding:12px;display:grid;gap:2px;min-width:0}
+.tile.over{background:var(--bad-soft)}
+.tile .big{font-size:1.5rem}
+.bar{height:8px;background:var(--line);border-radius:999px;overflow:hidden}
+.bar span{display:block;height:100%;width:0;background:var(--accent);transition:width .3s}
+.bar.over span{background:var(--bad)}
+.note{background:var(--warm-soft);border-radius:10px;padding:10px 12px;font-size:.95rem}
+.note.ok{background:var(--accent-soft)}
+.list{list-style:none;margin:0;padding:0;display:grid}
+.list li{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:12px;padding:10px 0;border-top:1px solid var(--line)}
+.list li:first-child{border-top:0}
+.list li.plain{grid-template-columns:1fr auto}
+.list input[type=checkbox]{width:26px;height:26px;accent-color:var(--accent);margin:0}
+.list label{display:grid;gap:2px;cursor:pointer;min-width:0}
+.what{font-weight:700;overflow-wrap:anywhere}
+.done .what{text-decoration:line-through;color:var(--muted)}
+.tag{display:inline-block;font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;font-weight:700;color:var(--accent);background:var(--accent-soft);border-radius:999px;padding:1px 8px;margin-left:6px;vertical-align:2px}
+form,.form{display:grid;gap:10px}
+.field{display:grid;gap:4px;min-width:0}
+.field label{font-weight:700;font-size:.92rem}
+input[type=text],input[type=number],input[type=date],select,textarea{font:inherit;font-size:16px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;width:100%;min-width:0;min-height:44px}
+input[type=date]{-webkit-appearance:none;appearance:none}
+textarea{resize:vertical;min-height:70px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btn{font:inherit;font-weight:700;border-radius:999px;padding:11px 18px;cursor:pointer;border:1.5px solid var(--accent);background:var(--accent);color:var(--accent-ink);justify-self:start;min-height:44px}
+.btn.ghost{background:transparent;color:var(--accent)}
+.btn.danger{background:transparent;color:var(--bad);border-color:var(--bad)}
+.btn:disabled{opacity:.5;cursor:default}
+.btns{display:flex;flex-wrap:wrap;gap:8px}
+.iconbtn{font:inherit;background:transparent;border:0;color:var(--muted);cursor:pointer;padding:8px 10px;border-radius:8px;min-width:40px;min-height:40px}
+.iconbtn:hover{color:var(--bad)}
+button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid var(--warm);outline-offset:2px}
+.status{font-size:.9rem;color:var(--muted);min-height:1.2em}
+.planrow{display:grid;grid-template-columns:1fr 110px 120px auto;gap:8px;align-items:center;padding:8px 0;border-top:1px solid var(--line)}
+.planrow:first-child{border-top:0}
+.tablewrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+td,th{text-align:left;padding:6px 6px;border-top:1px solid var(--line);vertical-align:middle}
+th{font-size:.78rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);border-top:0}
+td.amt,th.amt{text-align:right;white-space:nowrap}
+td select{padding:6px 8px}
+ol.steps{margin:0;padding-left:1.3em;display:grid;gap:4px}
+footer{text-align:center}
+@media (max-width:460px){.planrow{grid-template-columns:1fr 96px;}.planrow .ptype{grid-column:1}.planrow .pdel{grid-column:2;justify-self:end}}
+@media (max-width:380px){.tiles,.two{grid-template-columns:1fr}}
+@media (prefers-reduced-motion:reduce){.bar span{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header style="display:grid;gap:4px">
+    <h1>Sophie's money</h1>
+    <p class="muted" id="sub">Your payday plan, spending and budget. Works without signal.</p>
+  </header>
+
+  <p class="note" id="noStore" hidden>This phone isn't letting the app save anything (private browsing may be on). Open it from your home screen icon instead.</p>
+  <div class="note ok" id="updateBar" hidden style="display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap"><span>A new version of the app is ready.</span><button class="btn" type="button" id="updateBtn">Update now</button></div>
+  <p class="note" id="backupNag" hidden></p>
+
+  <div class="card" id="installCard" hidden>
+    <h2>Put this on your home screen first</h2>
+    <p class="small">Do this before you set anything up. On iPhone, the home screen app keeps its own copy of your figures, separate from Safari.</p>
+    <div id="installIos" hidden><ol class="steps small"><li>In Safari, tap the Share button (the square with an arrow).</li><li>Scroll down and tap <strong>Add to Home Screen</strong>, then <strong>Add</strong>.</li><li>Close Safari and open <strong>Money</strong> from your home screen.</li></ol></div>
+    <div id="installAndroid" hidden><ol class="steps small"><li>In Chrome, tap the ⋮ menu at the top right.</li><li>Tap <strong>Add to Home screen</strong> or <strong>Install app</strong>, then <strong>Install</strong>.</li><li>Open <strong>Money</strong> from your home screen.</li></ol></div>
+    <button class="btn ghost" type="button" id="installHide">I've done this</button>
+  </div>
+
+  <nav class="tabs" role="tablist" aria-label="Sections" id="tabsNav">
+    <button role="tab" id="tab-today" aria-selected="true" aria-controls="p-today">Today</button>
+    <button role="tab" id="tab-add" aria-selected="false" aria-controls="p-add">Add</button>
+    <button role="tab" id="tab-plan" aria-selected="false" aria-controls="p-plan">Plan</button>
+  </nav>
+
+  <!-- TODAY -->
+  <section id="p-today" role="tabpanel" aria-labelledby="tab-today" style="display:grid;gap:16px">
+    <div class="card" id="empty" hidden>
+      <h2>Set up your plan</h2>
+      <p class="muted small">Ethan has sent you a setup file or a setup code. Use one of them below. You only need to do this once.</p>
+      <div class="field"><label for="setupFile">Setup or backup file</label><input id="setupFile" type="file"></div>
+      <div class="field"><label for="setupCode">Or paste the setup code</label><textarea id="setupCode" placeholder="Starts with SMP1:" autocapitalize="off" autocomplete="off" spellcheck="false"></textarea></div>
+      <div class="btns"><button class="btn" type="button" id="setupGo">Load my plan</button><button class="btn ghost" type="button" id="startPlan">Start a blank plan</button></div>
+      <p class="status" id="setupStatus" aria-live="polite"></p>
+    </div>
+
+    <div class="card" id="bridgeCard" hidden>
+      <div class="row"><h2>Until your first payday</h2><span class="big" id="bLeft">–</span></div>
+      <p class="muted" id="bInfo"></p>
+      <div class="tiles">
+        <div class="tile" id="bWeekT"><span class="muted small">You can spend per week</span><span class="big" id="bWeek">–</span></div>
+        <div class="tile" id="bDayT"><span class="muted small">Per day</span><span class="big" id="bDay">–</span></div>
+      </div>
+      <h3>Bills to pay before payday</h3>
+      <ul class="list" id="bDues"></ul>
+      <form id="balForm">
+        <div class="two">
+          <div class="field"><label for="balNow">Money in your account now (£)</label><input id="balNow" type="number" step="0.01" inputmode="decimal" placeholder="e.g. 640.00"></div>
+          <div class="field" style="align-content:end"><button class="btn" type="submit" id="balBtn">Update my money</button></div>
+        </div>
+        <p class="status" id="balStatus" aria-live="polite"></p>
+      </form>
+      <p class="muted small">Tick a bill once it's paid. Spending you add from the day you update your money comes off what's left. Bill and saving payments aren't counted twice.</p>
+    </div>
+
+    <div class="card" id="payCard">
+      <div class="row"><h2>Next payday</h2><span class="big" id="nextPay">–</span></div>
+      <p class="muted" id="payInfo">Loading…</p>
+    </div>
+
+    <div class="card" id="weekCard">
+      <div class="row"><h2>This week</h2><span class="muted small" id="weekRange"></span></div>
+      <div class="tiles" id="weekTiles"></div>
+      <p class="muted small">Weekly money is your monthly amount spread over the weeks. Weeks start on Monday.</p>
+    </div>
+
+    <div class="card" id="periodCard">
+      <div class="row"><h2>This pay month</h2><span class="muted small" id="periodRange"></span></div>
+      <ul class="list" id="periodList"></ul>
+    </div>
+
+    <div class="card" id="tickCard">
+      <h2 id="tickHead">On payday, move the money</h2>
+      <p class="muted small">Tick each one once it's in its Space or paid. Ticks start fresh each payday.</p>
+      <div class="bar" aria-hidden="true"><span id="tickBar"></span></div>
+      <p class="muted small" id="tickText" aria-live="polite"></p>
+      <ul class="list" id="tickList"></ul>
+      <div class="row" style="border-top:2px solid var(--ink);padding-top:10px"><strong>Left over each month</strong><span class="num" id="leftOver">–</span></div>
+    </div>
+
+    <div class="card" id="owedCard" hidden>
+      <div class="row"><h2>Paying Ethan back</h2><span class="num" id="owedLeft">–</span></div>
+      <ul class="list" id="owedList"></ul>
+      <p class="muted small">Tick a payment when you've sent it.</p>
+    </div>
+
+    <div class="card" id="recentCard">
+      <h2>Recent spending</h2>
+      <ul class="list" id="recent"></ul>
+    </div>
+  </section>
+
+  <!-- ADD -->
+  <section id="p-add" role="tabpanel" aria-labelledby="tab-add" hidden style="display:grid;gap:16px">
+    <div class="card">
+      <h2>Add a payment</h2>
+      <form id="addForm">
+        <div class="two">
+          <div class="field"><label for="aAmount">Amount (£)</label><input id="aAmount" type="number" inputmode="decimal" step="0.01" min="0.01" required placeholder="12.50"></div>
+          <div class="field"><label for="aDate">Date</label><input id="aDate" type="date" required></div>
+        </div>
+        <div class="field"><label for="aDesc">What was it?</label><input id="aDesc" type="text" required placeholder="Tesco, lunch, petrol…" maxlength="80"></div>
+        <div class="field"><label for="aItem">Which part of your budget?</label><select id="aItem"></select></div>
+        <button class="btn" type="submit" id="aBtn">Add payment</button>
+        <p class="status" id="aStatus" aria-live="polite"></p>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>Import from Starling</h2>
+      <p class="muted small">In the Starling app, go to Account, then Statements, and export a CSV for the dates you want. Choose the file here. Only money going out is imported, and payments you've already added are skipped.</p>
+      <div class="field"><label for="csv">Statement file (.csv)</label><input id="csv" type="file"></div>
+      <div id="importBox" hidden style="display:grid;gap:10px">
+        <p class="small" id="importInfo"></p>
+        <div class="tablewrap"><table><thead><tr><th>Add</th><th>Date</th><th>What</th><th class="amt">£</th><th>Budget</th></tr></thead><tbody id="importRows"></tbody></table></div>
+        <button class="btn" type="button" id="importBtn">Add these payments</button>
+      </div>
+      <p class="status" id="importStatus" aria-live="polite"></p>
+    </div>
+  </section>
+
+  <!-- PLAN -->
+  <section id="p-plan" role="tabpanel" aria-labelledby="tab-plan" hidden style="display:grid;gap:16px">
+    <div class="card" id="planNone" hidden><p class="muted">Set up your plan on the Today tab first.</p></div>
+    <div id="planEditor" style="display:grid;gap:16px">
+    <div class="card">
+      <h2>Before your first pay</h2>
+      <label class="small" style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="bOn" style="width:24px;height:24px;accent-color:var(--accent)"> Show "Until your first payday" on the Today tab</label>
+      <div class="field"><label for="bUntil">Your first payday</label><input id="bUntil" type="date"></div>
+      <div class="two">
+        <div class="field"><label for="bBal">Money you have (£)</label><input id="bBal" type="number" step="0.01" min="0" inputmode="decimal"></div>
+        <div class="field"><label for="bAsOf">As of</label><input id="bAsOf" type="date"></div>
+      </div>
+      <h3>Bills to pay before payday</h3>
+      <div id="dueRows"></div>
+      <button class="btn ghost" type="button" id="addDue">Add a bill</button>
+      <p class="muted small">This view switches itself off on your first payday, and the normal weekly money takes over.</p>
+    </div>
+
+    <div class="card">
+      <h2>Your pay</h2>
+      <div class="two">
+        <div class="field"><label for="pPay">Monthly take-home (£)</label><input id="pPay" type="number" step="0.01" min="0" inputmode="decimal"></div>
+        <div class="field"><label for="pDay">Usual payday (day of month)</label><input id="pDay" type="number" min="1" max="31" step="1" inputmode="numeric"></div>
+      </div>
+      <div class="field"><label for="pNext">One-off payday, if a month pays on a different date (optional)</label><input id="pNext" type="date"></div>
+      <p class="muted small">If your payday falls on a weekend or bank holiday, the app moves it to the working day before, as the NHS does. If a month pays early (December often does), put that date in the one-off box. It only changes that month.</p>
+    </div>
+
+    <div class="card">
+      <div class="row"><h2>Budget lines</h2><span class="muted small">Left over: <span class="num" id="pLeft">–</span></span></div>
+      <div id="planRows"></div>
+      <button class="btn ghost" type="button" id="addLine">Add a line</button>
+      <p class="muted small"><strong>Spending</strong> lines get a weekly allowance and track what you spend. <strong>Bill</strong> and <strong>Saving</strong> lines are amounts you move on payday. Tick <strong>First</strong> for things to pay first if money is short.</p>
+    </div>
+
+    <div class="card">
+      <div class="row"><h2>Paying Ethan back</h2></div>
+      <div class="field"><label for="pOwedTotal">Total you owe (£)</label><input id="pOwedTotal" type="number" step="0.01" min="0" inputmode="decimal"></div>
+      <div id="owedRows"></div>
+      <button class="btn ghost" type="button" id="addOwed">Add a payment date</button>
+    </div>
+
+    <div class="card">
+      <button class="btn" type="button" id="savePlan">Save changes</button>
+      <p class="status" id="planStatus" aria-live="polite"></p>
+    </div>
+    </div>
+
+    <div class="card">
+      <h2>Back up and restore</h2>
+      <p class="muted small">Your figures live only on this phone. Make a backup every few weeks and keep it in Files, or send it to Ethan, so a new phone or a reset doesn't lose them.</p>
+      <p class="small" id="lastBackup"></p>
+      <div class="btns"><button class="btn" type="button" id="backupBtn">Back up my data</button></div>
+      <div class="field"><label for="restoreFile">Restore from a backup file</label><input id="restoreFile" type="file"></div>
+      <button class="btn ghost" type="button" id="restoreBtn" hidden>Replace everything with this backup</button>
+      <p class="status" id="backupStatus" aria-live="polite"></p>
+    </div>
+  </section>
+
+  <footer class="muted small" id="foot"></footer>
+</div>
+
+<script>
+(() => {
+  "use strict";
+  const APP_VERSION = "1.0.0";
+  const KEY = "sophieMoney.v1";
+  const $ = id => document.getElementById(id);
+  const fmt = n => (n < 0 ? "-£" : "£") + Math.abs(n).toLocaleString("en-GB", {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  const iso = d => d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  const parseIso = s => { const [y, m, d] = String(s).split("-").map(Number); return new Date(y, (m || 1) - 1, d || 1); };
+  const isIso = s => /^\d{4}-\d{2}-\d{2}$/.test(String(s || ""));
+  const nice = d => d.toLocaleDateString("en-GB", {weekday: "short", day: "numeric", month: "short"});
+  const niceLong = d => d.toLocaleDateString("en-GB", {day: "numeric", month: "long", year: "numeric"});
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
+  const round2 = n => Math.round(Number(n) * 100) / 100;
+  const TYPES = {spend: "Spending", bill: "Bill", save: "Saving"};
+  const todayDate = () => { const t = new Date(); t.setHours(0, 0, 0, 0); return t; };
+
+  // ---------- storage (this phone only) ----------
+  let storeOk = true;
+  function load() {
+    try {
+      const s = JSON.parse(localStorage.getItem(KEY) || "null");
+      if (s && typeof s === "object") return {plan: s.plan || null, expenses: Array.isArray(s.expenses) ? s.expenses : [], ticks: s.ticks || {}, lastBackup: s.lastBackup || 0};
+    } catch (e) { storeOk = false; }
+    return {plan: null, expenses: [], ticks: {}, lastBackup: 0};
+  }
+  let state = load();
+  function persist() {
+    try { localStorage.setItem(KEY, JSON.stringify(state)); storeOk = true; return true; }
+    catch (e) { storeOk = false; $("noStore").hidden = false; return false; }
+  }
+  try { localStorage.setItem(KEY + ".probe", "1"); localStorage.removeItem(KEY + ".probe"); } catch (e) { storeOk = false; }
+  $("noStore").hidden = storeOk;
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {}); } catch (e) {}
+
+  const plan = () => state.plan;
+  let draft = null;
+
+  // ---------- dates: paydays ----------
+  // England & Wales bank holidays (NHS pays on the working day before if payday falls on one).
+  const BANK_HOLIDAYS = new Set([
+    "2026-12-25", "2026-12-28",
+    "2027-01-01", "2027-03-26", "2027-03-29", "2027-05-03", "2027-05-31", "2027-08-30", "2027-12-27", "2027-12-28",
+    "2028-01-03", "2028-04-14", "2028-04-17", "2028-05-01", "2028-05-29", "2028-08-28", "2028-12-25", "2028-12-26"
+  ]);
+  function workingDayOnOrBefore(d) {
+    const x = new Date(d);
+    while (x.getDay() === 0 || x.getDay() === 6 || BANK_HOLIDAYS.has(iso(x))) x.setDate(x.getDate() - 1);
+    return x;
+  }
+  function usualPayday(y, m, day) { const last = new Date(y, m + 1, 0).getDate(); return workingDayOnOrBefore(new Date(y, m, Math.min(day, last))); }
+  // Payday for a calendar month: a one-off date in that month replaces the usual one.
+  function paydayForMonth(y, m) {
+    const p = plan();
+    const n = new Date(y, m, 1); y = n.getFullYear(); m = n.getMonth();
+    if (p && isIso(p.nextPayday)) { const o = parseIso(p.nextPayday); if (o.getFullYear() === y && o.getMonth() === m) return o; }
+    return usualPayday(y, m, Number(p?.paydayDay) || 27);
+  }
+  function periodNow() {
+    const today = todayDate();
+    const days = [];
+    for (let k = -2; k <= 2; k++) days.push(paydayForMonth(today.getFullYear(), today.getMonth() + k));
+    days.sort((a, b) => a - b);
+    const next = days.find(d => d > today);
+    const start = [...days].reverse().find(d => d <= today);
+    return {start, next, today};
+  }
+  function weekNow() { const t = todayDate(); const mon = new Date(t); mon.setDate(t.getDate() - ((t.getDay() + 6) % 7)); const sun = new Date(mon); sun.setDate(mon.getDate() + 6); return {mon, sun}; }
+  const dayDiff = (a, b) => Math.round((b - a) / 86400000);
+
+  // ---------- derived ----------
+  const items = () => (plan()?.items || []);
+  const totalOut = () => items().reduce((s, i) => s + (Number(i.amount) || 0), 0);
+  const expenses = () => state.expenses;
+  function spentIn(itemId, from, to) {
+    const f = iso(from), t = iso(to);
+    return expenses().filter(e => e.item === itemId && e.date >= f && e.date < t).reduce((s, e) => s + (Number(e.amount) || 0), 0);
+  }
+  function bridgeEnd() { const b = plan()?.bridge; const u = b?.until || plan()?.nextPayday; return isIso(u) ? parseIso(u) : null; }
+  function bridgeOn() { const b = plan()?.bridge; if (!b || !b.active) return false; const end = bridgeEnd(); return !!end && todayDate() < end; }
+  function bridgeCalc() {
+    const b = plan().bridge; const today = todayDate(); const end = bridgeEnd();
+    const since = isIso(b.asOf) ? b.asOf : iso(today);
+    const fixed = new Set(items().filter(i => i.type !== "spend").map(i => i.id));
+    const spent = expenses().filter(e => e.date >= since && !fixed.has(e.item)).reduce((s, e) => s + (Number(e.amount) || 0), 0);
+    const dues = (b.dues || []).filter(d => !d.paid).reduce((s, d) => s + (Number(d.amount) || 0), 0);
+    const hasBal = b.balance !== null && b.balance !== "" && b.balance !== undefined;
+    const avail = (Number(b.balance) || 0) - spent - dues;
+    const days = Math.max(1, dayDiff(today, end));
+    return {hasBal, since, spent, dues, avail, days, perDay: avail / days, perWeek: avail / days * 7, next: end};
+  }
+
+  // ---------- render ----------
+  const PLAN_CARDS = ["payCard", "weekCard", "periodCard", "tickCard", "recentCard"];
+  function render() {
+    $("foot").textContent = "Version " + APP_VERSION + " · Saved on this phone only";
+    renderBackupInfo();
+    if (!plan()) {
+      $("empty").hidden = false; $("bridgeCard").hidden = true; $("owedCard").hidden = true;
+      PLAN_CARDS.forEach(id => $(id).hidden = true);
+      $("planNone").hidden = false; $("planEditor").hidden = true;
+      return;
+    }
+    $("empty").hidden = true; PLAN_CARDS.forEach(id => $(id).hidden = false);
+    $("planNone").hidden = true; $("planEditor").hidden = false;
+    const p = plan();
+    const bOn = bridgeOn();
+    let {start, next, today} = periodNow();
+    // Before the first pay, the "pay month" runs from when she set her money to her first payday.
+    if (bOn) { next = bridgeEnd(); start = isIso(p.bridge.asOf) && parseIso(p.bridge.asOf) < next ? parseIso(p.bridge.asOf) : today; }
+    $("periodCard").querySelector("h2").textContent = bOn ? "Until payday" : "This pay month";
+    const shownNext = bOn ? bridgeEnd() : next;
+    const days = dayDiff(today, shownNext);
+    $("nextPay").textContent = nice(shownNext);
+    $("payInfo").textContent = (days === 0 ? "Today" : days === 1 ? "Tomorrow" : days + " days to go") + " · " + fmt(Number(p.pay) || 0) + " expected";
+    $("periodRange").textContent = nice(start) + " to " + nice(new Date(next.getFullYear(), next.getMonth(), next.getDate() - 1));
+
+    // before first pay
+    $("bridgeCard").hidden = !bOn; $("weekCard").hidden = bOn;
+    $("tickHead").textContent = bOn ? "On your first payday, move the money" : "On payday, move the money";
+    if (bOn) {
+      const c = bridgeCalc();
+      if (!c.hasBal) {
+        $("bLeft").textContent = "–"; $("bWeek").textContent = "–"; $("bDay").textContent = "–";
+        $("bWeekT").classList.remove("over"); $("bDayT").classList.remove("over"); $("bLeft").style.color = "";
+        $("bInfo").textContent = "Enter how much money you have now, and this shows what you can spend each week until " + nice(c.next) + ".";
+      } else {
+        $("bLeft").textContent = fmt(c.avail); $("bLeft").style.color = c.avail < 0 ? "var(--bad)" : "";
+        $("bWeek").textContent = fmt(c.perWeek); $("bDay").textContent = fmt(c.perDay);
+        $("bWeekT").classList.toggle("over", c.avail < 0); $("bDayT").classList.toggle("over", c.avail < 0);
+        $("bInfo").textContent = fmt(Number(p.bridge.balance) || 0) + " on " + nice(parseIso(c.since)) + ", less " + fmt(c.spent) + " spent since and " + fmt(c.dues) + " of bills still to pay. " + c.days + (c.days === 1 ? " day" : " days") + " until " + nice(c.next) + ".";
+      }
+      const bl = $("bDues"); bl.innerHTML = "";
+      (p.bridge.dues || []).forEach((d, idx) => {
+        const li = document.createElement("li"); if (d.paid) li.className = "done";
+        li.innerHTML = `<input type="checkbox" id="bd-${idx}" ${d.paid ? "checked" : ""}><label for="bd-${idx}"><span class="what">${esc(d.name)}</span><span class="muted small">${isIso(d.date) ? "Due " + nice(parseIso(d.date)) : ""}</span></label><span class="num">${fmt(Number(d.amount) || 0)}</span>`;
+        li.querySelector("input").addEventListener("change", e => setDuePaid(idx, e.target.checked));
+        bl.appendChild(li);
+      });
+      if (!(p.bridge.dues || []).length) bl.innerHTML = '<li class="plain"><span class="muted">No bills listed. Add any in the Plan tab.</span><span></span></li>';
+    }
+
+    // week tiles
+    const {mon, sun} = weekNow();
+    $("weekRange").textContent = nice(mon) + " to " + nice(sun);
+    const wk = $("weekTiles"); wk.innerHTML = "";
+    const endWeek = new Date(sun); endWeek.setDate(sun.getDate() + 1);
+    const spends = items().filter(i => i.type === "spend");
+    if (!spends.length) wk.innerHTML = '<p class="muted small">Add a Spending line in the Plan tab to get a weekly allowance.</p>';
+    spends.forEach(i => {
+      const allow = (Number(i.amount) || 0) * 12 / 52;
+      const spent = spentIn(i.id, mon, endWeek);
+      const left = allow - spent;
+      const el = document.createElement("div"); el.className = "tile" + (left < 0 ? " over" : "");
+      el.innerHTML = `<span class="muted small">${esc(i.name)} left</span><span class="big">${fmt(left)}</span><span class="muted small">${fmt(spent)} of ${fmt(allow)} spent</span>`;
+      wk.appendChild(el);
+    });
+
+    // pay-month list
+    const pl = $("periodList"); pl.innerHTML = "";
+    items().forEach(i => {
+      const spent = spentIn(i.id, start, next); const amt = Number(i.amount) || 0;
+      if (i.type !== "spend" && spent === 0) return;
+      const pct = amt ? Math.min(100, spent / amt * 100) : 0; const over = spent > amt;
+      const li = document.createElement("li"); li.className = "plain";
+      li.innerHTML = `<div style="display:grid;gap:4px;min-width:0"><span class="what">${esc(i.name)}</span><div class="bar${over ? " over" : ""}"><span style="width:${pct}%"></span></div></div><span class="num">${fmt(amt - spent)} left</span>`;
+      pl.appendChild(li);
+    });
+    if (!pl.children.length) pl.innerHTML = '<li class="plain"><span class="muted">Nothing spent yet this pay month.</span><span></span></li>';
+
+    // payday ticks (fresh each pay month)
+    const tickKey = iso(bOn ? bridgeEnd() : start);
+    const ticks = state.ticks[tickKey] || {};
+    const tl = $("tickList"); tl.innerHTML = "";
+    const ordered = [...items()].sort((a, b) => (b.first ? 1 : 0) - (a.first ? 1 : 0));
+    ordered.forEach(i => {
+      const li = document.createElement("li"); if (ticks[i.id]) li.className = "done";
+      li.innerHTML = `<input type="checkbox" id="t-${esc(i.id)}" ${ticks[i.id] ? "checked" : ""}><label for="t-${esc(i.id)}"><span class="what">${esc(i.name)}${i.first ? '<span class="tag">First</span>' : ""}</span><span class="muted small">${TYPES[i.type] || ""}${i.note ? " · " + esc(i.note) : ""}</span></label><span class="num">${fmt(Number(i.amount) || 0)}</span>`;
+      li.querySelector("input").addEventListener("change", e => toggleTick(tickKey, i.id, e.target.checked));
+      tl.appendChild(li);
+    });
+    const done = items().filter(i => ticks[i.id]).reduce((s, i) => s + (Number(i.amount) || 0), 0);
+    const tot = totalOut();
+    $("tickBar").style.width = (tot ? done / tot * 100 : 0) + "%";
+    $("tickText").textContent = fmt(done) + " of " + fmt(tot) + " sorted";
+    const left = (Number(p.pay) || 0) - tot;
+    $("leftOver").textContent = fmt(left); $("leftOver").style.color = left < 0 ? "var(--bad)" : "";
+
+    // owed
+    const ow = p.owed || {total: 0, payments: []};
+    const paid = (ow.payments || []).filter(x => x.paid).reduce((s, x) => s + (Number(x.amount) || 0), 0);
+    const owedLeft = (Number(ow.total) || 0) - paid;
+    $("owedCard").hidden = !(Number(ow.total) > 0);
+    $("owedLeft").textContent = owedLeft <= 0.004 ? "All paid" : fmt(owedLeft) + " left";
+    const ol = $("owedList"); ol.innerHTML = "";
+    (ow.payments || []).forEach((x, idx) => {
+      const li = document.createElement("li"); if (x.paid) li.className = "done";
+      li.innerHTML = `<input type="checkbox" id="o-${idx}" ${x.paid ? "checked" : ""}><label for="o-${idx}"><span class="what">${isIso(x.date) ? nice(parseIso(x.date)) : "No date"}</span></label><span class="num">${fmt(Number(x.amount) || 0)}</span>`;
+      li.querySelector("input").addEventListener("change", e => setOwedPaid(idx, e.target.checked));
+      ol.appendChild(li);
+    });
+
+    // recent
+    const rl = $("recent"); rl.innerHTML = "";
+    const name = id => items().find(i => i.id === id)?.name || "Other";
+    expenses().slice(0, 20).forEach(e => {
+      const li = document.createElement("li");
+      li.innerHTML = `<span class="muted small" style="white-space:nowrap">${nice(parseIso(e.date))}</span><span style="display:grid;min-width:0"><span class="what">${esc(e.desc || "Payment")}</span><span class="muted small">${esc(name(e.item))}</span></span><span style="display:flex;gap:2px;align-items:center"><span class="num">${fmt(Number(e.amount) || 0)}</span><button class="iconbtn" type="button" aria-label="Delete ${esc(e.desc || "payment")}">✕</button></span>`;
+      li.querySelector("button").addEventListener("click", ev => delExpense(e.id, ev.currentTarget));
+      rl.appendChild(li);
+    });
+    if (!expenses().length) rl.innerHTML = '<li class="plain"><span class="muted">No payments yet. Add one in the Add tab, or import a Starling statement.</span><span></span></li>';
+
+    // add-form budget list
+    const sel = $("aItem"); const keep = sel.value; sel.innerHTML = "";
+    items().forEach(i => { const o = document.createElement("option"); o.value = i.id; o.textContent = i.name; sel.appendChild(o); });
+    const def = items().find(i => i.type === "spend" && /fun/i.test(i.name)) || items().find(i => i.type === "spend");
+    sel.value = keep && items().some(i => i.id === keep) ? keep : (def?.id || "");
+  }
+
+  // ---------- writes ----------
+  function commit(nextPlan) { state.plan = nextPlan; persist(); render(); }
+  function toggleTick(key, id, on) {
+    const t = {...(state.ticks[key] || {}), [id]: on};
+    state.ticks = {...state.ticks, [key]: t};
+    // keep only the last 8 pay months of ticks
+    const keys = Object.keys(state.ticks).sort(); while (keys.length > 8) delete state.ticks[keys.shift()];
+    persist(); render();
+  }
+  function setDuePaid(idx, on) { const n = structuredClone(plan()); n.bridge.dues[idx].paid = on; commit(n); draft = null; }
+  function setOwedPaid(idx, on) { const n = structuredClone(plan()); n.owed.payments[idx].paid = on; commit(n); draft = null; }
+  $("balForm").addEventListener("submit", ev => {
+    ev.preventDefault();
+    const v = $("balNow").value; if (v === "" || isNaN(Number(v))) { $("balStatus").textContent = "Enter an amount, like 640.00."; return; }
+    const n = structuredClone(plan());
+    n.bridge = n.bridge || {active: true, dues: []};
+    n.bridge.balance = round2(v); n.bridge.asOf = iso(new Date()); n.bridge.active = true;
+    commit(n); draft = null;
+    $("balStatus").textContent = storeOk ? "Updated." : "That didn't save on this phone."; $("balNow").value = "";
+  });
+  function hash(s) { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) >>> 0; return h.toString(36); }
+  function addExpense({amount, desc, item, date, source}) {
+    const a = round2(amount);
+    if (!(a > 0)) throw new Error("Amount must be more than £0.");
+    const d = isIso(date) ? date : iso(new Date());
+    const it = items().find(i => i.id === item) ? item : (items().find(i => i.type === "spend")?.id || "other");
+    const id = (source === "starling" ? "s-" : "m-") + hash(d + "|" + a + "|" + desc + (source === "starling" ? "" : "|" + Date.now() + Math.random()));
+    if (state.expenses.some(e => e.id === id)) return null;
+    state.expenses.push({id, amount: a, desc: String(desc || "Payment").slice(0, 80), item: it, date: d, source: source || "manual", created: Date.now()});
+    state.expenses.sort((x, y) => (y.date.localeCompare(x.date)) || (y.created - x.created));
+    return {id, amount: a, date: d, item: it};
+  }
+  function delExpense(id, btn) {
+    if (btn && btn.dataset.armed !== "1") { btn.dataset.armed = "1"; btn.textContent = "Delete?"; btn.style.color = "var(--bad)"; setTimeout(() => { if (btn.isConnected) { btn.dataset.armed = ""; btn.textContent = "✕"; btn.style.color = ""; } }, 3000); return; }
+    state.expenses = state.expenses.filter(e => e.id !== id); persist(); render();
+  }
+
+  // ---------- add form ----------
+  $("aDate").value = iso(new Date());
+  $("addForm").addEventListener("submit", ev => {
+    ev.preventDefault();
+    if (!plan()) { $("aStatus").textContent = "Set up your plan first."; return; }
+    try {
+      const r = addExpense({amount: $("aAmount").value, desc: $("aDesc").value.trim(), item: $("aItem").value, date: $("aDate").value});
+      persist(); render();
+      $("aStatus").textContent = storeOk ? "Added " + fmt(r.amount) + "." : "That didn't save on this phone.";
+      $("aAmount").value = ""; $("aDesc").value = ""; $("aDate").value = iso(new Date());
+    } catch (e) { $("aStatus").textContent = e.message || "That didn't save. Try again."; }
+  });
+
+  // ---------- Starling import ----------
+  function parseCSV(text) {
+    text = text.replace(/^﻿/, "");
+    const rows = []; let row = [], f = "", q = false;
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      if (q) { if (c === '"') { if (text[i + 1] === '"') { f += '"'; i++; } else q = false; } else f += c; }
+      else if (c === '"') q = true;
+      else if (c === ",") { row.push(f); f = ""; }
+      else if (c === "\n" || c === "\r") { if (c === "\r" && text[i + 1] === "\n") i++; row.push(f); rows.push(row); row = []; f = ""; }
+      else f += c;
+    }
+    if (f.length || row.length) { row.push(f); rows.push(row); }
+    return rows.filter(r => r.some(x => x.trim()));
+  }
+  function toIso(s) {
+    s = String(s).trim();
+    let m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+    if (m) { const y = m[3].length === 2 ? "20" + m[3] : m[3]; return y + "-" + m[2].padStart(2, "0") + "-" + m[1].padStart(2, "0"); }
+    m = s.match(/^(\d{4})-(\d{2})-(\d{2})/); if (m) return m[1] + "-" + m[2] + "-" + m[3];
+    return "";
+  }
+  function guessItem(cat, desc) {
+    const c = (cat + " " + desc).toUpperCase();
+    const byName = re => items().find(i => re.test(i.name))?.id;
+    if (/GROCER|TESCO|SAINSBURY|ALDI|LIDL|ASDA|CO-?OP|M&S FOOD|WAITROSE|ICELAND/.test(c)) return byName(/food/i);
+    if (/BILL|PHONE|MOBILE|VOXI|EE |O2|VODAFONE|THREE|SUBSCRIP/.test(c)) return byName(/your bills/i) || byName(/bill/i);
+    return byName(/fun/i) || items().find(i => i.type === "spend")?.id;
+  }
+  let importList = [];
+  $("csv").addEventListener("change", async ev => {
+    const file = ev.target.files[0]; $("importStatus").textContent = ""; $("importBox").hidden = true;
+    if (!file) return;
+    if (!plan()) { $("importStatus").textContent = "Set up your plan first."; return; }
+    const rows = parseCSV(await file.text());
+    if (rows.length < 2) { $("importStatus").textContent = "That file looks empty."; return; }
+    const head = rows[0].map(h => h.trim().toLowerCase());
+    const col = re => head.findIndex(h => re.test(h));
+    const ci = {date: col(/date/), amt: col(/amount/), name: col(/counter ?party|name|description|payee|merchant/), ref: col(/reference/), cat: col(/category/), type: col(/^type/)};
+    if (ci.date < 0 || ci.amt < 0) { $("importStatus").textContent = "I couldn't find the Date and Amount columns. Check it's a Starling CSV export."; return; }
+    const have = new Set(expenses().map(e => e.id));
+    importList = [];
+    rows.slice(1).forEach(r => {
+      const amt = parseFloat(String(r[ci.amt] || "").replace(/[£,\s]/g, ""));
+      const d = toIso(r[ci.date]); if (!d || !(amt < 0)) return;
+      const type = ci.type >= 0 ? String(r[ci.type]).toUpperCase() : "";
+      const desc = ((ci.name >= 0 ? r[ci.name] : "") || (ci.ref >= 0 ? r[ci.ref] : "") || "Payment").trim();
+      if (/SPACE|INTERNAL TRANSFER/.test(type) || /^(?:to|from) .*space/i.test(desc)) return;
+      const a = round2(-amt);
+      const id = "s-" + hash(d + "|" + a + "|" + desc);
+      if (have.has(id) || importList.some(x => x.id === id)) return;
+      importList.push({id, date: d, amount: a, desc, item: guessItem(ci.cat >= 0 ? r[ci.cat] : "", desc) || "", on: true});
+    });
+    renderImport();
+  });
+  function renderImport() {
+    if (!importList.length) { $("importStatus").textContent = "No new payments going out in that file."; return; }
+    $("importBox").hidden = false;
+    $("importInfo").textContent = importList.length + " new payments found. Untick any you don't want, and check the budget for each.";
+    const tb = $("importRows"); tb.innerHTML = "";
+    importList.forEach((r, i) => {
+      const tr = document.createElement("tr");
+      const opts = items().map(it => `<option value="${esc(it.id)}" ${it.id === r.item ? "selected" : ""}>${esc(it.name)}</option>`).join("");
+      tr.innerHTML = `<td><input type="checkbox" id="im-${i}" ${r.on ? "checked" : ""} aria-label="Add ${esc(r.desc)}" style="width:24px;height:24px"></td><td style="white-space:nowrap">${nice(parseIso(r.date))}</td><td style="overflow-wrap:anywhere">${esc(r.desc)}</td><td class="amt">${fmt(r.amount)}</td><td><select id="ims-${i}" aria-label="Budget for ${esc(r.desc)}">${opts}</select></td>`;
+      tr.querySelector("input").addEventListener("change", e => r.on = e.target.checked);
+      tr.querySelector("select").addEventListener("change", e => r.item = e.target.value);
+      tb.appendChild(tr);
+    });
+  }
+  $("importBtn").addEventListener("click", () => {
+    const todo = importList.filter(r => r.on); if (!todo.length) return;
+    let n = 0;
+    todo.forEach(r => { if (addExpense({amount: r.amount, desc: r.desc, item: r.item, date: r.date, source: "starling"})) n++; });
+    persist(); render();
+    $("importStatus").textContent = storeOk ? "Added " + n + " payments." : "That didn't save on this phone.";
+    $("importBox").hidden = true; $("csv").value = ""; importList = [];
+  });
+
+  // ---------- plan editor ----------
+  function loadDraft() {
+    if (!plan()) return;
+    draft = structuredClone(plan());
+    draft.owed = draft.owed || {total: 0, payments: []}; draft.owed.payments = draft.owed.payments || [];
+    draft.bridge = draft.bridge || {active: false, balance: null, asOf: iso(new Date()), until: "", dues: []};
+    draft.bridge.dues = draft.bridge.dues || [];
+    renderDraft();
+  }
+  function renderDraft() {
+    if (!draft) return;
+    $("bOn").checked = !!draft.bridge.active;
+    $("bUntil").value = draft.bridge.until || draft.nextPayday || "";
+    $("bBal").value = draft.bridge.balance ?? ""; $("bAsOf").value = draft.bridge.asOf || "";
+    const dr = $("dueRows"); dr.innerHTML = "";
+    draft.bridge.dues.forEach((d, idx) => {
+      const r = document.createElement("div"); r.className = "planrow";
+      r.innerHTML = `<input type="text" aria-label="Bill name" value="${esc(d.name)}" maxlength="40"><input type="number" inputmode="decimal" aria-label="Amount for ${esc(d.name)}" step="0.01" min="0" value="${Number(d.amount) || 0}"><input class="ptype" type="date" aria-label="Due date" value="${esc(d.date || "")}"><span class="pdel"><button class="iconbtn" type="button" aria-label="Remove ${esc(d.name)}">✕</button></span>`;
+      const [n, a, dt] = r.querySelectorAll("input");
+      n.addEventListener("input", e => { d.name = e.target.value; });
+      a.addEventListener("input", e => { d.amount = Number(e.target.value) || 0; });
+      dt.addEventListener("change", e => { d.date = e.target.value; });
+      r.querySelector("button").addEventListener("click", () => { draft.bridge.dues.splice(idx, 1); renderDraft(); });
+      dr.appendChild(r);
+    });
+    $("pPay").value = draft.pay ?? ""; $("pDay").value = draft.paydayDay ?? 27; $("pNext").value = draft.nextPayday || "";
+    const pr = $("planRows"); pr.innerHTML = "";
+    draft.items.forEach((it, idx) => {
+      const r = document.createElement("div"); r.className = "planrow";
+      r.innerHTML = `<input type="text" aria-label="Line name" value="${esc(it.name)}" maxlength="40"><input type="number" inputmode="decimal" aria-label="Monthly amount for ${esc(it.name)}" step="0.01" min="0" value="${Number(it.amount) || 0}"><select class="ptype" aria-label="Type">${Object.entries(TYPES).map(([k, v]) => `<option value="${k}" ${k === it.type ? "selected" : ""}>${v}</option>`).join("")}</select><span class="pdel" style="display:flex;gap:6px;align-items:center"><label class="small" style="display:flex;gap:4px;align-items:center"><input type="checkbox" ${it.first ? "checked" : ""} style="width:20px;height:20px">First</label><button class="iconbtn" type="button" aria-label="Remove ${esc(it.name)}">✕</button></span>`;
+      const [n, a, f] = r.querySelectorAll("input");
+      n.addEventListener("input", e => { it.name = e.target.value; });
+      a.addEventListener("input", e => { it.amount = Number(e.target.value) || 0; draftLeft(); });
+      r.querySelector("select").addEventListener("change", e => { it.type = e.target.value; });
+      f.addEventListener("change", e => { it.first = e.target.checked; });
+      r.querySelector("button").addEventListener("click", () => { draft.items.splice(idx, 1); renderDraft(); });
+      pr.appendChild(r);
+    });
+    $("pOwedTotal").value = Number(draft.owed.total) || 0;
+    const orw = $("owedRows"); orw.innerHTML = "";
+    draft.owed.payments.forEach((x, idx) => {
+      const r = document.createElement("div"); r.className = "planrow";
+      r.innerHTML = `<input type="date" aria-label="Payment date" value="${esc(x.date || "")}"><input type="number" inputmode="decimal" aria-label="Payment amount" step="0.01" min="0" value="${Number(x.amount) || 0}"><span class="ptype small muted">${x.paid ? "Paid" : "Not yet"}</span><span class="pdel"><button class="iconbtn" type="button" aria-label="Remove payment">✕</button></span>`;
+      const [dt, a] = r.querySelectorAll("input");
+      dt.addEventListener("change", e => { x.date = e.target.value; });
+      a.addEventListener("input", e => { x.amount = Number(e.target.value) || 0; });
+      r.querySelector("button").addEventListener("click", () => { draft.owed.payments.splice(idx, 1); renderDraft(); });
+      orw.appendChild(r);
+    });
+    draftLeft();
+  }
+  function draftLeft() { const l = (Number(draft.pay) || 0) - draft.items.reduce((s, i) => s + (Number(i.amount) || 0), 0); $("pLeft").textContent = fmt(l); $("pLeft").style.color = l < 0 ? "var(--bad)" : ""; }
+  $("pPay").addEventListener("input", e => { if (draft) { draft.pay = Number(e.target.value) || 0; draftLeft(); } });
+  $("pDay").addEventListener("input", e => { if (draft) draft.paydayDay = Math.min(31, Math.max(1, Math.round(Number(e.target.value)) || 27)); });
+  $("pNext").addEventListener("change", e => { if (draft) draft.nextPayday = e.target.value || ""; });
+  $("pOwedTotal").addEventListener("input", e => { if (draft) draft.owed.total = Number(e.target.value) || 0; });
+  $("bOn").addEventListener("change", e => { if (draft) draft.bridge.active = e.target.checked; });
+  $("bUntil").addEventListener("change", e => { if (draft) draft.bridge.until = e.target.value || ""; });
+  $("bBal").addEventListener("input", e => { if (draft) { draft.bridge.balance = e.target.value === "" ? null : Number(e.target.value); if (!draft.bridge.asOf) draft.bridge.asOf = iso(new Date()); } });
+  $("bAsOf").addEventListener("change", e => { if (draft) draft.bridge.asOf = e.target.value || iso(new Date()); });
+  $("addDue").addEventListener("click", () => { if (!draft) return; draft.bridge.dues.push({name: "New bill", amount: 0, date: "", paid: false}); renderDraft(); });
+  $("addLine").addEventListener("click", () => { if (!draft) return; draft.items.push({id: "l" + Date.now().toString(36), name: "New line", amount: 0, type: "bill", first: false}); renderDraft(); });
+  $("addOwed").addEventListener("click", () => { if (!draft) return; draft.owed.payments.push({date: iso(new Date()), amount: 0, paid: false}); renderDraft(); });
+  $("savePlan").addEventListener("click", () => {
+    if (!draft) return;
+    draft.items = draft.items.filter(i => String(i.name).trim());
+    draft.items.forEach(i => { if (!i.id) i.id = "l" + Math.random().toString(36).slice(2, 8); i.amount = round2(i.amount); });
+    draft.bridge.dues = draft.bridge.dues.filter(d => String(d.name).trim());
+    commit(structuredClone(draft)); loadDraft();
+    $("planStatus").textContent = storeOk ? "Saved." : "That didn't save on this phone.";
+  });
+
+  // ---------- setup, backup and restore ----------
+  function blankPlan() {
+    return {pay: 0, paydayDay: 27, nextPayday: "", items: [{id: "food", name: "Food", amount: 0, type: "spend", first: true}, {id: "fun", name: "Fun money", amount: 0, type: "spend", first: false}], owed: {total: 0, payments: []}, bridge: {active: false, balance: null, asOf: iso(new Date()), until: "", dues: []}};
+  }
+  function decodeBackup(text) {
+    text = String(text || "").trim();
+    if (/^SMP1:/i.test(text)) {
+      const b = text.slice(5).replace(/\s+/g, "").replace(/-/g, "+").replace(/_/g, "/");
+      const bin = atob(b); const bytes = Uint8Array.from(bin, c => c.charCodeAt(0));
+      text = new TextDecoder().decode(bytes);
+    }
+    const o = JSON.parse(text);
+    if (!o || o.app !== "sophie-money" || !o.plan || !Array.isArray(o.plan.items)) throw new Error("bad");
+    return {plan: o.plan, expenses: Array.isArray(o.expenses) ? o.expenses.filter(e => e && e.id && isIso(e.date)) : [], ticks: o.ticks && typeof o.ticks === "object" ? o.ticks : {}};
+  }
+  function applyBackup(b) {
+    state = {plan: b.plan, expenses: b.expenses.sort((x, y) => y.date.localeCompare(x.date)), ticks: b.ticks, lastBackup: state.lastBackup || 0};
+    persist(); draft = null; render();
+  }
+  $("setupGo").addEventListener("click", async () => {
+    const f = $("setupFile").files[0]; const code = $("setupCode").value;
+    if (!f && !code.trim()) { $("setupStatus").textContent = "Choose the file Ethan sent, or paste the code."; return; }
+    try {
+      applyBackup(decodeBackup(f ? await f.text() : code));
+      $("setupStatus").textContent = ""; $("setupCode").value = ""; $("setupFile").value = "";
+    } catch (e) { $("setupStatus").textContent = "That doesn't look like a setup file or code. Ask Ethan to send it again."; }
+  });
+  $("startPlan").addEventListener("click", () => { state.plan = blankPlan(); persist(); render(); show("plan"); });
+
+  function renderBackupInfo() {
+    const lb = state.lastBackup;
+    $("lastBackup").textContent = lb ? "Last backup: " + niceLong(new Date(lb)) + "." : "You haven't made a backup yet.";
+    const stale = plan() && (state.expenses.length >= 5 || lb) && (!lb || Date.now() - lb > 30 * 86400000);
+    $("backupNag").hidden = !stale;
+    if (stale) $("backupNag").textContent = (lb ? "It's been over a month since your last backup." : "You haven't backed up yet.") + " Go to Plan, then Back up my data.";
+  }
+  $("backupBtn").addEventListener("click", async () => {
+    if (!plan()) { $("backupStatus").textContent = "Nothing to back up yet."; return; }
+    const data = JSON.stringify({app: "sophie-money", version: 1, exported: new Date().toISOString(), plan: state.plan, expenses: state.expenses, ticks: state.ticks}, null, 1);
+    const name = "sophie-money-backup-" + iso(new Date()) + ".json";
+    const file = new File([data], name, {type: "application/json"});
+    let ok = false;
+    try {
+      if (navigator.canShare && navigator.canShare({files: [file]})) { await navigator.share({files: [file], title: "Money backup"}); ok = true; }
+    } catch (e) { if (e && e.name === "AbortError") { $("backupStatus").textContent = "Backup cancelled."; return; } }
+    if (!ok) {
+      const url = URL.createObjectURL(file); const a = document.createElement("a");
+      a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10000); ok = true;
+    }
+    state.lastBackup = Date.now(); persist(); renderBackupInfo();
+    $("backupStatus").textContent = "Backup made. Save it to Files, or send it to Ethan.";
+  });
+  let pendingRestore = null;
+  $("restoreFile").addEventListener("change", async ev => {
+    const f = ev.target.files[0]; pendingRestore = null; $("restoreBtn").hidden = true; $("backupStatus").textContent = "";
+    if (!f) return;
+    try {
+      pendingRestore = decodeBackup(await f.text());
+      $("restoreBtn").hidden = false;
+      $("backupStatus").textContent = "Backup has " + pendingRestore.expenses.length + " payments. Tap the button to replace what's on this phone with it.";
+    } catch (e) { $("backupStatus").textContent = "That isn't a backup file from this app."; }
+  });
+  $("restoreBtn").addEventListener("click", () => {
+    if (!pendingRestore) return;
+    applyBackup(pendingRestore); pendingRestore = null; $("restoreBtn").hidden = true; $("restoreFile").value = "";
+    $("backupStatus").textContent = "Restored."; loadDraft();
+  });
+
+  // ---------- tabs ----------
+  const tabs = ["today", "add", "plan"];
+  function show(name) {
+    tabs.forEach(t => { $("tab-" + t).setAttribute("aria-selected", String(t === name)); $("p-" + t).hidden = t !== name; });
+    if (name === "plan") loadDraft();
+    if (name === "add") $("aDate").value = $("aDate").value || iso(new Date());
+    window.scrollTo(0, 0);
+  }
+  tabs.forEach(t => $("tab-" + t).addEventListener("click", () => show(t)));
+
+  // ---------- install hint ----------
+  const standalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+  const ios = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const android = /android/i.test(navigator.userAgent);
+  let hideInstall = false; try { hideInstall = localStorage.getItem(KEY + ".installHidden") === "1"; } catch (e) {}
+  if (!standalone && !hideInstall && (ios || android)) {
+    $("installCard").hidden = false; $("installIos").hidden = !ios; $("installAndroid").hidden = ios;
+  }
+  $("installHide").addEventListener("click", () => { $("installCard").hidden = true; try { localStorage.setItem(KEY + ".installHidden", "1"); } catch (e) {} });
+
+  // ---------- keep dates fresh ----------
+  let lastDay = iso(new Date());
+  function refreshIfNewDay() { const d = iso(new Date()); if (d !== lastDay) { lastDay = d; if ($("aDate").value < d) $("aDate").value = d; render(); } }
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshIfNewDay(); });
+  setInterval(refreshIfNewDay, 60000);
+  window.addEventListener("storage", e => { if (e.key === KEY) { state = load(); draft = null; render(); } });
+
+  // ---------- offline support ----------
+  if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost" || location.hostname === "127.0.0.1")) {
+    const hadController = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.register("./sw.js").then(reg => {
+      const offer = w => { if (!w || !hadController) return; $("updateBar").hidden = false; $("updateBtn").onclick = () => w.postMessage("skipWaiting"); };
+      if (reg.waiting) offer(reg.waiting);
+      reg.addEventListener("updatefound", () => { const w = reg.installing; w && w.addEventListener("statechange", () => { if (w.state === "installed") offer(w); }); });
+      document.addEventListener("visibilitychange", () => { if (!document.hidden) reg.update().catch(() => {}); });
+    }).catch(() => {});
+    let reloading = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => { if (hadController && !reloading) { reloading = true; location.reload(); } });
+  }
+
+  render();
+  window.__smp = {periodNow, bridgeOn, paydayForMonth, iso};
+})();
+</script>
+</body>
+</html>
