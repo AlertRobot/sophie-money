@@ -1,6 +1,6 @@
 // Offline support for Sophie's Money. Bump VERSION whenever any file changes,
 // so phones pick up the new version the next time they open the app online.
-const VERSION = "1.0.0";
+const VERSION = "1.0.1";
 const CACHE = "sophie-money-" + VERSION;
 const FILES = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png", "./apple-touch-icon.png"];
 
